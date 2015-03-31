@@ -8,12 +8,12 @@ import javax.jdo.PersistenceManagerFactory;
 import javax.jmi.reflect.DuplicateException;
 import javax.naming.NamingException;
 import javax.servlet.ServletContext;
-import javax.ws.rs.NotFoundException;
 
 import org.openmdx.base.exception.ServiceException;
 import org.openmdx.base.naming.Path;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
+import org.opentdc.service.exception.NotFoundException;
 
 public class OpencrxServiceProvider implements ServiceProvider {
 	
@@ -39,7 +39,10 @@ public class OpencrxServiceProvider implements ServiceProvider {
 	
 	// instance variables
 
-	public OpencrxServiceProvider(ServletContext context) {
+	public OpencrxServiceProvider(
+		ServletContext context,
+		String prefix
+	) {
 		logger.info("> OpencrxImpl()");
 
 		if (url == null) {
