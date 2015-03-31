@@ -15,7 +15,7 @@ import org.openmdx.base.naming.Path;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
 
-public class OpencrxImpl implements ServiceProvider {
+public class OpencrxServiceProvider implements ServiceProvider {
 	
 	public static final String XRI_ACTIVITY_SEGMENT = "xri://@openmdx*org.opencrx.kernel.activity1";
 	public static final String XRI_ACCOUNT_SEGMENT = "xri://@openmdx*org.opencrx.kernel.account1";
@@ -39,7 +39,7 @@ public class OpencrxImpl implements ServiceProvider {
 	
 	// instance variables
 
-	public OpencrxImpl(ServletContext context) {
+	public OpencrxServiceProvider(ServletContext context) {
 		logger.info("> OpencrxImpl()");
 
 		if (url == null) {
