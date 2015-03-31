@@ -1,6 +1,7 @@
 package org.opentdc.resources.opencrx;
 
 import java.util.ArrayList;
+import java.util.logging.Logger;
 
 import javax.jdo.PersistenceManager;
 import javax.jdo.PersistenceManagerFactory;
@@ -12,11 +13,10 @@ import javax.ws.rs.NotFoundException;
 import org.openmdx.base.exception.ServiceException;
 import org.openmdx.base.naming.Path;
 import org.opentdc.resources.ResourceModel;
-import org.opentdc.resources.StorageProvider;
+import org.opentdc.resources.ServiceProvider;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
-public class OpencrxImpl extends StorageProvider {
+public class OpencrxImpl implements ServiceProvider {
+	
 	public static final String XRI_ACTIVITY_SEGMENT = "xri://@openmdx*org.opencrx.kernel.activity1";
 	public static final String XRI_ACCOUNT_SEGMENT = "xri://@openmdx*org.opencrx.kernel.account1";
 	public static final short ACTIVITY_GROUP_TYPE_PROJECT = 40;
@@ -35,12 +35,12 @@ public class OpencrxImpl extends StorageProvider {
 	private static String password = null;
 	private static String mimeType = null;
 
+	protected Logger logger = Logger.getLogger(this.getClass().getName());
+	
 	// instance variables
 
 	public OpencrxImpl(ServletContext context) {
 		logger.info("> OpencrxImpl()");
-
-		super.initStorageProvider();
 
 		if (url == null) {
 			url = context.getInitParameter("backend.url");
@@ -77,7 +77,7 @@ public class OpencrxImpl extends StorageProvider {
 	public ArrayList<ResourceModel> listResources() {
 		// TODO: implement listResources
 		logger.info("listResources() -> " + countResources() + " resources");
-		throw new org.opentdc.exception.NotImplementedException("listResources is not yet implemented");
+		throw new org.opentdc.service.exception.NotImplementedException("listResources is not yet implemented");
 	}
 
 	/**
@@ -92,11 +92,11 @@ public class OpencrxImpl extends StorageProvider {
 	public ResourceModel createResource(ResourceModel resource) throws DuplicateException {
 		if (readResource(resource.getId()) != null) {
 			// object with same ID exists already
-			throw new org.opentdc.exception.DuplicateException();
+			throw new org.opentdc.service.exception.DuplicateException();
 		}
 		// TODO: implement createResource
 		logger.info("createResource() -> " + countResources() + " resources");
-		throw new org.opentdc.exception.NotImplementedException(
+		throw new org.opentdc.service.exception.NotImplementedException(
 			"method createResource is not yet implemented for opencrx storage");
 		// logger.info("createResource() -> " + resource);
 	}
@@ -114,7 +114,7 @@ public class OpencrxImpl extends StorageProvider {
 	public ResourceModel readResource(String xri) throws NotFoundException {
 		ResourceModel _resource = null;
 		// TODO: implement readResource()
-		throw new org.opentdc.exception.NotImplementedException(
+		throw new org.opentdc.service.exception.NotImplementedException(
 			"method readResource() is not yet implemented for opencrx storage");
 		// logger.info("readResource(" + xri + ") -> " + _resource);
 	}
@@ -123,14 +123,14 @@ public class OpencrxImpl extends StorageProvider {
 	public ResourceModel updateResource(ResourceModel resource) throws NotFoundException {
 		ResourceModel _resource = null;
 		// TODO implement updateResource()
-		throw new org.opentdc.exception.NotImplementedException(
+		throw new org.opentdc.service.exception.NotImplementedException(
 				"method updateResource() is not yet implemented for opencrx storage.");
 	}
 
 	@Override
 	public void deleteResource(String id) throws NotFoundException {
 		// TODO implement deleteResource()
-		throw new org.opentdc.exception.NotImplementedException(
+		throw new org.opentdc.service.exception.NotImplementedException(
 				"method deleteResource() is not yet implemented for opencrx storage.");
 	}
 
@@ -138,7 +138,7 @@ public class OpencrxImpl extends StorageProvider {
 	public int countResources() {
 		int _count = -1;
 		// TODO: implement countResources()
-		throw new org.opentdc.exception.NotImplementedException(
+		throw new org.opentdc.service.exception.NotImplementedException(
 				"method countResources() is not yet implemented for opencrx storage.");
 		// logger.info("countResources() = " + _count);
 		// return _count;
