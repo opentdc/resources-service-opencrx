@@ -77,7 +77,12 @@ public class OpencrxServiceProvider implements ServiceProvider {
 	 * @return a list of all resources.
 	 */
 	@Override
-	public ArrayList<ResourceModel> listResources() {
+	public ArrayList<ResourceModel> listResources(
+		String queryType,
+		String query,
+		long position,
+		long size
+	) {
 		// TODO: implement listResources
 		logger.info("listResources() -> " + countResources() + " resources");
 		throw new org.opentdc.service.exception.NotImplementedException("listResources is not yet implemented");
@@ -123,7 +128,10 @@ public class OpencrxServiceProvider implements ServiceProvider {
 	}
 
 	@Override
-	public ResourceModel updateResource(ResourceModel resource) throws NotFoundException {
+	public ResourceModel updateResource(
+		String id,
+		ResourceModel resource
+	) throws NotFoundException {
 		ResourceModel _resource = null;
 		// TODO implement updateResource()
 		throw new org.opentdc.service.exception.NotImplementedException(
