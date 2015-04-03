@@ -13,5 +13,6 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry combineaccessrules="false" kind="src" path="/opentdc 1 ~ services-generic (jre-1.7)"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/opentdc 1 ~ services-opencrx (jre-1.7)"/>
 	<classpathentry kind="output" path="build/jre-1.7/eclipse"/>
 </classpath>
