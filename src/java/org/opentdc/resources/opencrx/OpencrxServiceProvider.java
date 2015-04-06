@@ -1,29 +1,70 @@
+/**
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2015 Arbalo AG
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 package org.opentdc.resources.opencrx;
 
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.logging.Logger;
 
+import javax.jdo.PersistenceManager;
 import javax.jmi.reflect.DuplicateException;
 import javax.naming.NamingException;
 import javax.servlet.ServletContext;
 
+import org.opencrx.kernel.account1.cci2.ContactQuery;
+import org.opencrx.kernel.account1.jmi1.Contact;
+import org.opencrx.kernel.activity1.cci2.ResourceQuery;
+import org.opencrx.kernel.activity1.jmi1.Resource;
+import org.opencrx.kernel.utils.Utils;
 import org.openmdx.base.exception.ServiceException;
+import org.openmdx.base.persistence.cci.Queries;
+import org.openmdx.base.rest.spi.Facades;
+import org.openmdx.base.rest.spi.Query_2Facade;
 import org.opentdc.opencrx.AbstractOpencrxServiceProvider;
+import org.opentdc.opencrx.ActivitiesHelper;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
+import org.opentdc.service.exception.InternalServerErrorException;
 import org.opentdc.service.exception.NotFoundException;
 
+/**
+ * OpencrxServiceProvider
+ *
+ */
 public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider implements ServiceProvider {
 	
-	public static final short ACTIVITY_GROUP_TYPE_PROJECT = 40;
-	public static final short ACCOUNT_ROLE_CUSTOMER = 100;
-	public static final short ACTIVITY_CLASS_INCIDENT = 2;
-	public static final short ICAL_TYPE_NA = 0;
-	public static final short ICAL_CLASS_NA = 0;
-	public static final short ICAL_TYPE_VEVENT = 1;
-
 	protected static final Logger logger = Logger.getLogger(OpencrxServiceProvider.class.getName());
 	
+	/**
+	 * Constructor.
+	 * 
+	 * @param context
+	 * @param prefix
+	 * @throws ServiceException
+	 * @throws NamingException
+	 */
 	public OpencrxServiceProvider(
 		ServletContext context,
 		String prefix
@@ -31,90 +72,243 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 		super(context, prefix);
 	}
 
-	/******************************** resource *****************************************/
 	/**
-	 * List all resources.
-	 * 
-	 * @return a list of all resources.
-	 */
-	@Override
-	public ArrayList<ResourceModel> listResources(
-		String queryType,
-		String query,
-		long position,
-		long size
-	) {
-		// TODO: implement listResources
-		logger.info("listResources() -> " + countResources() + " resources");
-		throw new org.opentdc.service.exception.NotImplementedException("listResources is not yet implemented");
-	}
-
-	/**
-	 * Create a new Resource.
+	 * Map resource to resource model.
 	 * 
 	 * @param resource
-	 * @return the newly created resource (can be different than resource param)
-	 * @throws DuplicateException
-	 *             if a resource with the same ID already exists.
+	 * @return
 	 */
-	@Override
-	public ResourceModel createResource(ResourceModel resource) throws DuplicateException {
-		if (readResource(resource.getId()) != null) {
-			// object with same ID exists already
-			throw new org.opentdc.service.exception.DuplicateException();
+	protected ResourceModel newResourceModel(
+		Resource resource
+	) {
+		ResourceModel r = new ResourceModel(resource.refGetPath().getLastSegment().toClassicRepresentation());
+		r.setXri(resource.refGetPath().toXRI());
+		r.setName(resource.getName());
+		if(resource.getContact() != null) {
+			r.setFirstName(resource.getContact().getFirstName());
+			r.setLastName(resource.getContact().getLastName());
 		}
-		// TODO: implement createResource
-		logger.info("createResource() -> " + countResources() + " resources");
-		throw new org.opentdc.service.exception.NotImplementedException(
-			"method createResource is not yet implemented for opencrx storage");
-		// logger.info("createResource() -> " + resource);
+		return r;
 	}
 
-	/**
-	 * Find a Resource by ID.
-	 * 
-	 * @param id
-	 *            the Resource ID
-	 * @return the Resource
-	 * @throws NotFoundException
-	 *             if there exists no Resource with this ID
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#listResources(java.lang.String, java.lang.String, long, long)
 	 */
 	@Override
-	public ResourceModel readResource(String xri) throws NotFoundException {
-		ResourceModel _resource = null;
-		// TODO: implement readResource()
-		throw new org.opentdc.service.exception.NotImplementedException(
-			"method readResource() is not yet implemented for opencrx storage");
-		// logger.info("readResource(" + xri + ") -> " + _resource);
+	public List<ResourceModel> listResources(
+		String queryType,
+		String query,
+		int position,
+		int size
+	) {
+		try {
+			PersistenceManager pm = this.getPersistenceManager();
+			org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+			Query_2Facade resourcesQueryFacade = Facades.newQuery(null);
+			resourcesQueryFacade.setQueryType(
+				queryType == null || queryType.isEmpty()
+					? "org:opencrx:kernel:activity1:Resource"
+					: queryType
+				);
+			if(query != null && !query.isEmpty()) {
+				resourcesQueryFacade.setQuery(query);
+			}
+			ResourceQuery resourcesQuery = (ResourceQuery)pm.newQuery(
+				Queries.QUERY_LANGUAGE,
+				resourcesQueryFacade.getDelegate()
+			);
+			resourcesQuery.forAllDisabled().isFalse();
+			resourcesQuery.orderByName().ascending();
+			resourcesQuery.thereExistsCategory().equalTo(ActivitiesHelper.RESOURCE_CATEGORY_PROJECT);
+			List<Resource> resources = activitySegment.getResource(resourcesQuery);
+			List<ResourceModel> result = new ArrayList<ResourceModel>();
+			int count = 0;
+			for(Iterator<Resource> i = resources.listIterator(position); i.hasNext(); ) {
+				Resource resource = i.next();
+				result.add(this.newResourceModel(resource));
+				count++;
+				if(count > size) {
+					break;
+				}
+			}
+			return result;
+		} catch(ServiceException e) {
+			e.log();
+			throw new InternalServerErrorException(e.getMessage());
+		}
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#createResource(org.opentdc.resources.ResourceModel)
+	 */
+	@Override
+	public ResourceModel createResource(
+		ResourceModel r
+	) throws DuplicateException {
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		org.opencrx.kernel.account1.jmi1.Segment accountSegment = this.getAccountSegment();
+		if(r.getId() != null) {
+			Resource resource = null;
+			try {
+				resource = activitySegment.getResource(r.getId()); 
+			} catch(Exception ignore) {}
+			if(resource != null) {
+				throw new org.opentdc.service.exception.DuplicateException();
+			}
+		}
+		PersistenceManager pm = this.getPersistenceManager();
+		Contact contact = null;
+		// Find contact matching firstName, lastName
+		{
+			ContactQuery contactQuery = (ContactQuery)pm.newQuery(Contact.class);
+			contactQuery.thereExistsLastName().equalTo(r.getLastName());
+			contactQuery.thereExistsFirstName().equalTo(r.getFirstName());
+			contactQuery.forAllDisabled().isFalse();
+			List<Contact> contacts = accountSegment.getAccount(contactQuery);
+			if(contacts.isEmpty()) {
+				contact = pm.newInstance(Contact.class);
+				contact.setFirstName(r.getFirstName());
+				contact.setLastName(r.getLastName());
+				try {
+					pm.currentTransaction().begin();
+					accountSegment.addAccount(
+						Utils.getUidAsString(),
+						contact
+					);
+					pm.currentTransaction().commit();
+				} catch(Exception e) {
+					new ServiceException(e).log();
+					try {
+						pm.currentTransaction().rollback();
+					} catch(Exception ignore) {}
+				}
+			} else {
+				contact = contacts.iterator().next();
+			}
+		}
+		// Create resource
+		Resource resource = null;
+		{
+			resource = pm.newInstance(Resource.class);
+			if(r.getName() == null || r.getName().isEmpty()) {
+				if(contact == null) {
+					resource.setName(r.getLastName() + ", " + r.getFirstName());
+				} else {
+					resource.setName(contact.getFullName());
+				}
+			} else {
+				resource.setName(r.getName());
+			}
+			resource.setContact(contact);
+			resource.getCategory().add(ActivitiesHelper.RESOURCE_CATEGORY_PROJECT);
+			try {
+				pm.currentTransaction().begin();
+				activitySegment.addResource(
+					Utils.getUidAsString(),
+					resource
+				);
+				pm.currentTransaction().commit();
+			} catch(Exception e) {
+				new ServiceException(e).log();
+				try {
+					pm.currentTransaction().rollback();
+				} catch(Exception ignore) {}
+				throw new InternalServerErrorException("Unable to create resource");
+			}
+		}
+		return this.newResourceModel(resource);
+	}
+
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#readResource(java.lang.String)
+	 */
+	@Override
+	public ResourceModel readResource(
+		String id
+	) throws NotFoundException {
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		Resource resource = null;
+		try {
+			resource = activitySegment.getResource(id);
+		} catch(Exception ignore) {}
+		if(resource == null) {
+			throw new org.opentdc.service.exception.NotFoundException(id);
+		} else {
+			return this.newResourceModel(resource);
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#updateResource(java.lang.String, org.opentdc.resources.ResourceModel)
+	 */
 	@Override
 	public ResourceModel updateResource(
 		String id,
-		ResourceModel resource
+		ResourceModel r
 	) throws NotFoundException {
-		ResourceModel _resource = null;
-		// TODO implement updateResource()
-		throw new org.opentdc.service.exception.NotImplementedException(
-				"method updateResource() is not yet implemented for opencrx storage.");
+		PersistenceManager pm = this.getPersistenceManager();
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		Resource resource = activitySegment.getResource(id);
+		if(resource == null) {
+			throw new org.opentdc.service.exception.NotFoundException(id);
+		} else {
+			try {
+				pm.currentTransaction().begin();
+				resource.setName(r.getName());
+				pm.currentTransaction().commit();
+			} catch(Exception e) {
+				new ServiceException(e).log();
+				try {
+					pm.currentTransaction().rollback();
+				} catch(Exception ignore) {}
+				throw new InternalServerErrorException("Unable to update resource");
+			}
+			return this.newResourceModel(resource);
+		}
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#deleteResource(java.lang.String)
+	 */
 	@Override
-	public void deleteResource(String id) throws NotFoundException {
-		// TODO implement deleteResource()
-		throw new org.opentdc.service.exception.NotImplementedException(
-				"method deleteResource() is not yet implemented for opencrx storage.");
+	public void deleteResource(
+		String id
+	) throws NotFoundException {
+		PersistenceManager pm = this.getPersistenceManager();
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		Resource resource = null;
+		try {
+			resource = activitySegment.getResource(id);
+		} catch(Exception ignore) {}
+		if(resource == null || Boolean.TRUE.equals(resource.isDisabled())) {
+			throw new org.opentdc.service.exception.NotFoundException(id);
+		} else {
+			try {
+				pm.currentTransaction().begin();
+				resource.setDisabled(true);
+				pm.currentTransaction().commit();
+			} catch(Exception e) {
+				new ServiceException(e).log();
+				try {
+					pm.currentTransaction().rollback();
+				} catch(Exception ignore) {}
+				throw new InternalServerErrorException("Unable to delete resource");
+			}
+		}
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#countResources()
+	 */
 	@Override
-	public int countResources() {
-		int _count = -1;
-		// TODO: implement countResources()
-		throw new org.opentdc.service.exception.NotImplementedException(
-				"method countResources() is not yet implemented for opencrx storage.");
-		// logger.info("countResources() = " + _count);
-		// return _count;
+	public int countResources(
+	) {
+		return this.listResources(
+			null, // queryType 
+			null, // query 
+			0, // position 
+			Integer.MAX_VALUE // size
+		).size();
 	}
-
 
 }
