@@ -81,14 +81,13 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	protected ResourceModel newResourceModel(
 		Resource resource
 	) {
-		ResourceModel r = new ResourceModel(resource.refGetPath().getLastSegment().toClassicRepresentation());
-		r.setXri(resource.refGetPath().toXRI());
-		r.setName(resource.getName());
+		ResourceModel _r = new ResourceModel();
+		_r.setName(resource.getName());
 		if(resource.getContact() != null) {
-			r.setFirstName(resource.getContact().getFirstName());
-			r.setLastName(resource.getContact().getLastName());
+			_r.setFirstName(resource.getContact().getFirstName());
+			_r.setLastName(resource.getContact().getLastName());
 		}
-		return r;
+		return _r;
 	}
 
 	/* (non-Javadoc)
