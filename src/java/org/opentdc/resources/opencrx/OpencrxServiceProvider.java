@@ -295,19 +295,4 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 			}
 		}
 	}
-
-	/* (non-Javadoc)
-	 * @see org.opentdc.resources.ServiceProvider#countResources()
-	 */
-	@Override
-	public int countResources(
-	) {
-		return this.listResources(
-			null, // queryType 
-			null, // query 
-			0, // position 
-			Integer.MAX_VALUE // size
-		).size();
-	}
-
 }
