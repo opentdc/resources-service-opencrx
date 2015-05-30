@@ -46,8 +46,7 @@ import org.opentdc.opencrx.AbstractOpencrxServiceProvider;
 import org.opentdc.opencrx.ActivitiesHelper;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
-import org.opentdc.service.exception.InternalServerErrorException;
-import org.opentdc.service.exception.NotFoundException;
+import org.opentdc.service.exception.*;
 
 /**
  * OpencrxServiceProvider
@@ -143,7 +142,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	@Override
 	public ResourceModel createResource(
 		ResourceModel r
-	) throws DuplicateException {
+	) throws DuplicateException, ValidationException {
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
 		org.opencrx.kernel.account1.jmi1.Segment accountSegment = this.getAccountSegment();
 		if(r.getId() != null) {
@@ -244,7 +243,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	public ResourceModel updateResource(
 		String id,
 		ResourceModel r
-	) throws NotFoundException {
+	) throws NotFoundException, NotAllowedException, InternalServerErrorException {
 		PersistenceManager pm = this.getPersistenceManager();
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
 		Resource resource = activitySegment.getResource(id);
@@ -272,7 +271,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	@Override
 	public void deleteResource(
 		String id
-	) throws NotFoundException {
+	) throws NotFoundException, InternalServerErrorException {
 		PersistenceManager pm = this.getPersistenceManager();
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
 		Resource resource = null;
