@@ -243,7 +243,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	public ResourceModel updateResource(
 		String id,
 		ResourceModel r
-	) throws NotFoundException, NotAllowedException, InternalServerErrorException {
+	) throws NotFoundException, ValidationException, InternalServerErrorException {
 		PersistenceManager pm = this.getPersistenceManager();
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
 		Resource resource = activitySegment.getResource(id);
