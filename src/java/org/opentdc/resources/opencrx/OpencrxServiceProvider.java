@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.logging.Logger;
 
 import javax.jdo.PersistenceManager;
-import javax.jmi.reflect.DuplicateException;
 import javax.naming.NamingException;
 import javax.servlet.ServletContext;
 
@@ -46,7 +45,10 @@ import org.opentdc.opencrx.AbstractOpencrxServiceProvider;
 import org.opentdc.opencrx.ActivitiesHelper;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
-import org.opentdc.service.exception.*;
+import org.opentdc.service.exception.DuplicateException;
+import org.opentdc.service.exception.InternalServerErrorException;
+import org.opentdc.service.exception.NotFoundException;
+import org.opentdc.service.exception.ValidationException;
 
 /**
  * OpencrxServiceProvider
@@ -74,19 +76,32 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	/**
 	 * Map resource to resource model.
 	 * 
-	 * @param resource
+	 * @param _resource
 	 * @return
 	 */
-	protected ResourceModel newResourceModel(
-		Resource resource
+	protected ResourceModel mapToResource(
+		Resource _resource
 	) {
-		ResourceModel _r = new ResourceModel();
-		_r.setName(resource.getName());
-		if(resource.getContact() != null) {
-			_r.setFirstName(resource.getContact().getFirstName());
-			_r.setLastName(resource.getContact().getLastName());
+		ResourceModel resource = new ResourceModel();
+		resource.setName(_resource.getName());
+		resource.setCreatedAt(_resource.getCreatedAt());
+		resource.setCreatedBy(_resource.getCreatedBy().get(0));
+		resource.setModifiedAt(_resource.getModifiedAt());
+		resource.setModifiedBy(_resource.getModifiedBy().get(0));
+		resource.setId(_resource.refGetPath().getLastSegment().toClassicRepresentation());
+		Contact contact = null;
+		try {
+			contact = _resource.getContact();
+		} catch(Exception ignore) {}
+		if(contact != null) {
+			resource.setFirstName(_resource.getContact().getFirstName());
+			resource.setLastName(_resource.getContact().getLastName());
+		} else {
+			String[] names = resource.getName().split(",");
+			resource.setLastName(names.length > 0 ? names[0].trim() : "");
+			resource.setFirstName(names.length > 1 ? names[1].trim() : "");
 		}
-		return _r;
+		return resource;
 	}
 
 	/* (non-Javadoc)
@@ -123,9 +138,9 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 			int count = 0;
 			for(Iterator<Resource> i = resources.listIterator(position); i.hasNext(); ) {
 				Resource resource = i.next();
-				result.add(this.newResourceModel(resource));
+				result.add(this.mapToResource(resource));
 				count++;
-				if(count > size) {
+				if(count >= size) {
 					break;
 				}
 			}
@@ -141,32 +156,46 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	 */
 	@Override
 	public ResourceModel createResource(
-		ResourceModel r
+		ResourceModel resource
 	) throws DuplicateException, ValidationException {
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
 		org.opencrx.kernel.account1.jmi1.Segment accountSegment = this.getAccountSegment();
-		if(r.getId() != null) {
-			Resource resource = null;
+		if(resource.getId() != null) {
+			Resource _resource = null;
 			try {
-				resource = activitySegment.getResource(r.getId()); 
+				_resource = activitySegment.getResource(resource.getId()); 
 			} catch(Exception ignore) {}
-			if(resource != null) {
-				throw new org.opentdc.service.exception.DuplicateException();
+			if(_resource != null) {
+				throw new DuplicateException("Resource with ID " + resource.getId() + " exists already.");			
+			} else {
+				throw new ValidationException("Resource <" + resource.getId() + "> contains an ID generated on the client. This is not allowed.");
 			}
+		}
+		if(resource.getName() == null || resource.getName().isEmpty()) {
+			throw new ValidationException("resource must have a valid name.");
+		}
+		if(resource.getFirstName() == null || resource.getFirstName().isEmpty()) {
+			throw new ValidationException("resource must have a valid firstName.");
+		}
+		if(resource.getLastName() == null || resource.getLastName().isEmpty()) {
+			throw new ValidationException("resource must have a valid lastName.");
+		}
+		if(resource.getContactId() == null || resource.getContactId().isEmpty()) {
+			throw new ValidationException("resource must have a valid contactId.");
 		}
 		PersistenceManager pm = this.getPersistenceManager();
 		Contact contact = null;
 		// Find contact matching firstName, lastName
 		{
 			ContactQuery contactQuery = (ContactQuery)pm.newQuery(Contact.class);
-			contactQuery.thereExistsLastName().equalTo(r.getLastName());
-			contactQuery.thereExistsFirstName().equalTo(r.getFirstName());
+			contactQuery.thereExistsLastName().equalTo(resource.getLastName());
+			contactQuery.thereExistsFirstName().equalTo(resource.getFirstName());
 			contactQuery.forAllDisabled().isFalse();
 			List<Contact> contacts = accountSegment.getAccount(contactQuery);
 			if(contacts.isEmpty()) {
 				contact = pm.newInstance(Contact.class);
-				contact.setFirstName(r.getFirstName());
-				contact.setLastName(r.getLastName());
+				contact.setFirstName(resource.getFirstName());
+				contact.setLastName(resource.getLastName());
 				try {
 					pm.currentTransaction().begin();
 					accountSegment.addAccount(
@@ -185,27 +214,28 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 			}
 		}
 		// Create resource
-		Resource resource = null;
+		Resource _resource = null;
 		{
-			resource = pm.newInstance(Resource.class);
-			if(r.getName() == null || r.getName().isEmpty()) {
+			_resource = pm.newInstance(Resource.class);
+			if(resource.getName() == null || resource.getName().isEmpty()) {
 				if(contact == null) {
-					resource.setName(r.getLastName() + ", " + r.getFirstName());
+					_resource.setName(resource.getLastName() + ", " + resource.getFirstName());
 				} else {
-					resource.setName(contact.getFullName());
+					_resource.setName(contact.getFullName());
 				}
 			} else {
-				resource.setName(r.getName());
+				_resource.setName(resource.getName());
 			}
-			resource.setContact(contact);
-			resource.getCategory().add(ActivitiesHelper.RESOURCE_CATEGORY_PROJECT);
+			_resource.setContact(contact);
+			_resource.getCategory().add(ActivitiesHelper.RESOURCE_CATEGORY_PROJECT);
 			try {
 				pm.currentTransaction().begin();
 				activitySegment.addResource(
 					Utils.getUidAsString(),
-					resource
+					_resource
 				);
 				pm.currentTransaction().commit();
+				return this.readResource(_resource.refGetPath().getLastSegment().toClassicRepresentation());
 			} catch(Exception e) {
 				new ServiceException(e).log();
 				try {
@@ -214,7 +244,6 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 				throw new InternalServerErrorException("Unable to create resource");
 			}
 		}
-		return this.newResourceModel(resource);
 	}
 
 	/* (non-Javadoc)
@@ -229,10 +258,10 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 		try {
 			resource = activitySegment.getResource(id);
 		} catch(Exception ignore) {}
-		if(resource == null) {
+		if(resource == null || Boolean.TRUE.equals(resource.isDisabled())) {
 			throw new org.opentdc.service.exception.NotFoundException(id);
 		} else {
-			return this.newResourceModel(resource);
+			return this.mapToResource(resource);
 		}
 	}
 
@@ -261,7 +290,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 				} catch(Exception ignore) {}
 				throw new InternalServerErrorException("Unable to update resource");
 			}
-			return this.newResourceModel(resource);
+			return this.readResource(id);
 		}
 	}
 
