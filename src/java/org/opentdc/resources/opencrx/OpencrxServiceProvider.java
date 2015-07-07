@@ -96,6 +96,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 		if(contact != null) {
 			resource.setFirstName(_resource.getContact().getFirstName());
 			resource.setLastName(_resource.getContact().getLastName());
+			resource.setContactId(contact.refGetPath().getLastSegment().toClassicRepresentation());
 		} else {
 			String[] names = resource.getName().split(",");
 			resource.setLastName(names.length > 0 ? names[0].trim() : "");
@@ -158,6 +159,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	public ResourceModel createResource(
 		ResourceModel resource
 	) throws DuplicateException, ValidationException {
+		PersistenceManager pm = this.getPersistenceManager();
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
 		org.opencrx.kernel.account1.jmi1.Segment accountSegment = this.getAccountSegment();
 		if(resource.getId() != null) {
@@ -183,35 +185,11 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 		if(resource.getContactId() == null || resource.getContactId().isEmpty()) {
 			throw new ValidationException("resource must have a valid contactId.");
 		}
-		PersistenceManager pm = this.getPersistenceManager();
-		Contact contact = null;
-		// Find contact matching firstName, lastName
-		{
-			ContactQuery contactQuery = (ContactQuery)pm.newQuery(Contact.class);
-			contactQuery.thereExistsLastName().equalTo(resource.getLastName());
-			contactQuery.thereExistsFirstName().equalTo(resource.getFirstName());
-			contactQuery.forAllDisabled().isFalse();
-			List<Contact> contacts = accountSegment.getAccount(contactQuery);
-			if(contacts.isEmpty()) {
-				contact = pm.newInstance(Contact.class);
-				contact.setFirstName(resource.getFirstName());
-				contact.setLastName(resource.getLastName());
-				try {
-					pm.currentTransaction().begin();
-					accountSegment.addAccount(
-						Utils.getUidAsString(),
-						contact
-					);
-					pm.currentTransaction().commit();
-				} catch(Exception e) {
-					new ServiceException(e).log();
-					try {
-						pm.currentTransaction().rollback();
-					} catch(Exception ignore) {}
-				}
-			} else {
-				contact = contacts.iterator().next();
-			}
+		Contact contact = (Contact)accountSegment.getAccount(resource.getContactId());
+		if(contact == null) {
+			if(resource.getContactId() == null || resource.getContactId().isEmpty()) {
+				throw new ValidationException("resource must have a valid contactId.");
+			}			
 		}
 		// Create resource
 		Resource _resource = null;
@@ -271,17 +249,20 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	@Override
 	public ResourceModel updateResource(
 		String id,
-		ResourceModel r
+		ResourceModel resource
 	) throws NotFoundException, ValidationException, InternalServerErrorException {
 		PersistenceManager pm = this.getPersistenceManager();
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
-		Resource resource = activitySegment.getResource(id);
-		if(resource == null) {
+		org.opencrx.kernel.account1.jmi1.Segment accountSegment = this.getAccountSegment();		
+		Resource _resource = activitySegment.getResource(id);
+		if(_resource == null) {
 			throw new org.opentdc.service.exception.NotFoundException(id);
 		} else {
 			try {
 				pm.currentTransaction().begin();
-				resource.setName(r.getName());
+				_resource.setName(resource.getName());
+				Contact contact = (Contact)accountSegment.getAccount(resource.getContactId());
+				_resource.setContact(contact);
 				pm.currentTransaction().commit();
 			} catch(Exception e) {
 				new ServiceException(e).log();
