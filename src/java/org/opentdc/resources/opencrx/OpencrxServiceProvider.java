@@ -32,7 +32,6 @@ import javax.jdo.PersistenceManager;
 import javax.naming.NamingException;
 import javax.servlet.ServletContext;
 
-import org.opencrx.kernel.account1.cci2.ContactQuery;
 import org.opencrx.kernel.account1.jmi1.Contact;
 import org.opencrx.kernel.activity1.cci2.ResourceQuery;
 import org.opencrx.kernel.activity1.jmi1.Resource;
