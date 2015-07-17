@@ -42,6 +42,7 @@ import org.openmdx.base.rest.spi.Facades;
 import org.openmdx.base.rest.spi.Query_2Facade;
 import org.opentdc.opencrx.AbstractOpencrxServiceProvider;
 import org.opentdc.opencrx.ActivitiesHelper;
+import org.opentdc.resources.RateRefModel;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
 import org.opentdc.service.exception.DuplicateException;
@@ -302,5 +303,33 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 				throw new InternalServerErrorException("Unable to delete resource");
 			}
 		}
+	}
+
+	@Override
+	public List<RateRefModel> listRateRefs(String resourceId, String queryType,
+			String query, int position, int size) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public RateRefModel createRateRef(String resourceId, RateRefModel rateRef)
+			throws DuplicateException, ValidationException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public RateRefModel readRateRef(String resourceId, String rateRefId)
+			throws NotFoundException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void deleteRateRef(String resourceId, String rateRefId)
+			throws NotFoundException, InternalServerErrorException {
+		// TODO Auto-generated method stub
+		
 	}
 }
