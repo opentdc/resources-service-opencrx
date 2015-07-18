@@ -34,7 +34,9 @@ import javax.servlet.ServletContext;
 
 import org.opencrx.kernel.account1.jmi1.Contact;
 import org.opencrx.kernel.activity1.cci2.ResourceQuery;
+import org.opencrx.kernel.activity1.cci2.ResourceRateQuery;
 import org.opencrx.kernel.activity1.jmi1.Resource;
+import org.opencrx.kernel.activity1.jmi1.ResourceRate;
 import org.opencrx.kernel.utils.Utils;
 import org.openmdx.base.exception.ServiceException;
 import org.openmdx.base.persistence.cci.Queries;
@@ -51,7 +53,7 @@ import org.opentdc.service.exception.NotFoundException;
 import org.opentdc.service.exception.ValidationException;
 
 /**
- * OpencrxServiceProvider
+ * Resources service for openCRX.
  *
  */
 public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider implements ServiceProvider {
@@ -103,6 +105,47 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 			resource.setFirstName(names.length > 1 ? names[1].trim() : "");
 		}
 		return resource;
+	}
+
+	/**
+	 * Map resource rate to rate ref.
+	 * 
+	 * @param resourceRate
+	 * @return
+	 */
+	protected RateRefModel mapToRateRef(
+		ResourceRate resourceRate
+	) {
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		RateRefModel rateRef = new RateRefModel();
+		rateRef.setCreatedAt(resourceRate.getCreatedAt());
+		rateRef.setCreatedBy(resourceRate.getCreatedBy().get(0));
+		rateRef.setId(resourceRate.refGetPath().getLastSegment().toClassicRepresentation());
+		if(resourceRate.getName().startsWith("#")) {
+			String rateId = resourceRate.getName().substring(1);
+			rateRef.setRateId(rateId);
+			Resource ratesResource = ActivitiesHelper.findRatesResource(activitySegment);
+			rateRef.setRateTitle(ratesResource.getResourceRate(rateId).getName());
+		}
+		return rateRef;
+	}
+
+	/**
+	 * Get resource with given id.
+	 * 
+	 * @param activitySegment
+	 * @param id
+	 * @return
+	 */
+	protected Resource getResource(
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment,
+		String id
+	) {
+		Resource resource = null;
+		try {
+			resource = activitySegment.getResource(id);
+		} catch(Exception ignore) {}
+		return resource; 
 	}
 
 	/* (non-Javadoc)
@@ -232,10 +275,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 		String id
 	) throws NotFoundException {
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
-		Resource resource = null;
-		try {
-			resource = activitySegment.getResource(id);
-		} catch(Exception ignore) {}
+		Resource resource = this.getResource(activitySegment, id);
 		if(resource == null || Boolean.TRUE.equals(resource.isDisabled())) {
 			throw new org.opentdc.service.exception.NotFoundException(id);
 		} else {
@@ -253,9 +293,9 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	) throws NotFoundException, ValidationException, InternalServerErrorException {
 		PersistenceManager pm = this.getPersistenceManager();
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
-		org.opencrx.kernel.account1.jmi1.Segment accountSegment = this.getAccountSegment();		
-		Resource _resource = activitySegment.getResource(id);
-		if(_resource == null) {
+		org.opencrx.kernel.account1.jmi1.Segment accountSegment = this.getAccountSegment();	
+		Resource _resource = this.getResource(activitySegment, id);
+		if(_resource == null || Boolean.TRUE.equals(_resource.isDisabled())) {
 			throw new org.opentdc.service.exception.NotFoundException(id);
 		} else {
 			try {
@@ -284,10 +324,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	) throws NotFoundException, InternalServerErrorException {
 		PersistenceManager pm = this.getPersistenceManager();
 		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
-		Resource resource = null;
-		try {
-			resource = activitySegment.getResource(id);
-		} catch(Exception ignore) {}
+		Resource resource = this.getResource(activitySegment, id);
 		if(resource == null || Boolean.TRUE.equals(resource.isDisabled())) {
 			throw new org.opentdc.service.exception.NotFoundException(id);
 		} else {
@@ -305,31 +342,156 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 		}
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#listRateRefs(java.lang.String, java.lang.String, java.lang.String, int, int)
+	 */
 	@Override
-	public List<RateRefModel> listRateRefs(String resourceId, String queryType,
-			String query, int position, int size) {
-		// TODO Auto-generated method stub
-		return null;
+	public List<RateRefModel> listRateRefs(
+		String resourceId, 
+		String queryType,
+		String query, 
+		int position, 
+		int size
+	) {
+		PersistenceManager pm = this.getPersistenceManager();
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		Resource resource = this.getResource(activitySegment, resourceId);
+		if(resource == null || Boolean.TRUE.equals(resource.isDisabled())) {
+			throw new org.opentdc.service.exception.NotFoundException(resourceId);
+		} else {		
+			try {
+				ResourceRateQuery resourceRateQuery = (ResourceRateQuery)pm.newQuery(ResourceRate.class);
+				resourceRateQuery.forAllDisabled().isFalse();
+				resourceRateQuery.orderByName().ascending();
+				List<ResourceRate> resourceRates = resource.getResourceRate(resourceRateQuery);
+				List<RateRefModel> result = new ArrayList<RateRefModel>();
+				int count = 0;
+				for(Iterator<ResourceRate> i = resourceRates.listIterator(position); i.hasNext(); ) {
+					ResourceRate resourceRate = i.next();
+					result.add(this.mapToRateRef(resourceRate));
+					count++;
+					if(count >= size) {
+						break;
+					}
+				}
+				return result;
+			} catch(Exception e) {
+				new ServiceException(e).log();
+				throw new InternalServerErrorException(e.getMessage());
+			}
+		}
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#createRateRef(java.lang.String, org.opentdc.resources.RateRefModel)
+	 */
 	@Override
-	public RateRefModel createRateRef(String resourceId, RateRefModel rateRef)
-			throws DuplicateException, ValidationException {
-		// TODO Auto-generated method stub
-		return null;
+	public RateRefModel createRateRef(
+		String resourceId, 
+		RateRefModel rateRef
+	) throws DuplicateException, ValidationException {
+		PersistenceManager pm = this.getPersistenceManager();
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		Resource resource = this.getResource(activitySegment, resourceId);
+		if(resource == null || Boolean.TRUE.equals(resource.isDisabled())) {
+			throw new org.opentdc.service.exception.NotFoundException(resourceId);
+		} else {
+			if(rateRef.getId() != null) {
+				ResourceRate resourceRate = null;
+				try {
+					resourceRate = resource.getResourceRate(rateRef.getId());
+				} catch(Exception ignore) {}
+				if(resourceRate != null) {
+					throw new DuplicateException("RateRef with ID " + rateRef.getId() + " exists already.");			
+				} else {
+					throw new ValidationException("RateRef <" + rateRef.getId() + "> contains an ID generated on the client. This is not allowed.");
+				}
+			}
+			if (rateRef.getRateId() == null || rateRef.getRateId().isEmpty()) {
+				throw new ValidationException("RateRefModel <" + resourceId + "> must contain a valid rateId.");
+			}			
+			ResourceRate resourceRate = null;
+			try {
+				pm.currentTransaction().begin();
+				resourceRate = pm.newInstance(ResourceRate.class);
+				resourceRate.setName("#" + rateRef.getRateId());
+				ResourceRate referencedRate = ActivitiesHelper.findRatesResource(activitySegment).getResourceRate(rateRef.getRateId());
+				if(referencedRate != null) {
+					resourceRate.setDescription(referencedRate.getDescription());
+					resourceRate.setRate(referencedRate.getRate());
+					resourceRate.setRateType(referencedRate.getRateType());
+					resourceRate.setRateCurrency(referencedRate.getRateCurrency());
+				}
+				resource.addResourceRate(
+					Utils.getUidAsString(),
+					resourceRate
+				);
+				pm.currentTransaction().commit();
+				return this.readRateRef(
+					resource.refGetPath().getLastSegment().toClassicRepresentation(),
+					resourceRate.refGetPath().getLastSegment().toClassicRepresentation()
+				);
+			} catch(Exception e) {
+				new ServiceException(e).log();
+				try {
+					pm.currentTransaction().rollback();
+				} catch(Exception ignore) {}
+				throw new InternalServerErrorException("Unable to create rate ref");
+			}
+		}
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#readRateRef(java.lang.String, java.lang.String)
+	 */
 	@Override
-	public RateRefModel readRateRef(String resourceId, String rateRefId)
-			throws NotFoundException {
-		// TODO Auto-generated method stub
-		return null;
+	public RateRefModel readRateRef(
+		String resourceId, 
+		String rateRefId
+	) throws NotFoundException {
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		Resource resource = this.getResource(activitySegment, resourceId);
+		if(resource == null || Boolean.TRUE.equals(resource.isDisabled())) {
+			throw new org.opentdc.service.exception.NotFoundException(resourceId);
+		} else {
+			ResourceRate resourceRate = resource.getResourceRate(rateRefId);
+			if(resourceRate == null || Boolean.TRUE.equals(resourceRate.isDisabled())) {
+				throw new org.opentdc.service.exception.NotFoundException(resourceId);				
+			}
+			return this.mapToRateRef(resourceRate);
+		}
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#deleteRateRef(java.lang.String, java.lang.String)
+	 */
 	@Override
-	public void deleteRateRef(String resourceId, String rateRefId)
-			throws NotFoundException, InternalServerErrorException {
-		// TODO Auto-generated method stub
-		
+	public void deleteRateRef(
+		String resourceId, 
+		String rateRefId
+	) throws NotFoundException, InternalServerErrorException {
+		PersistenceManager pm = this.getPersistenceManager();
+		org.opencrx.kernel.activity1.jmi1.Segment activitySegment = this.getActivitySegment();
+		Resource resource = this.getResource(activitySegment, resourceId);
+		if(resource == null || Boolean.TRUE.equals(resource.isDisabled())) {
+			throw new org.opentdc.service.exception.NotFoundException(resourceId);
+		} else {
+			ResourceRate resourceRate = resource.getResourceRate(rateRefId);
+			if(resourceRate == null || Boolean.TRUE.equals(resourceRate.isDisabled())) {
+				throw new org.opentdc.service.exception.NotFoundException(resourceId);				
+			}
+			try {
+				pm.currentTransaction().begin();
+				resourceRate.setDisabled(true);
+				pm.currentTransaction().commit();
+			} catch(Exception e) {
+				new ServiceException(e).log();
+				try {
+					pm.currentTransaction().rollback();
+				} catch(Exception ignore) {}
+				throw new InternalServerErrorException("Unable to delete rate ref");
+			}
+		}
 	}
+	
 }
