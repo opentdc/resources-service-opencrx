@@ -153,8 +153,8 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	 */
 	@Override
 	public List<ResourceModel> listResources(
-		String queryType,
 		String query,
+		String queryType,
 		int position,
 		int size
 	) {
@@ -348,8 +348,8 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	@Override
 	public List<RateRefModel> listRateRefs(
 		String resourceId, 
-		String queryType,
-		String query, 
+		String query,
+		String queryType, 
 		int position, 
 		int size
 	) {
