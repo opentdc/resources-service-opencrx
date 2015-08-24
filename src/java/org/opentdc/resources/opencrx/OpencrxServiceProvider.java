@@ -31,6 +31,7 @@ import java.util.logging.Logger;
 import javax.jdo.PersistenceManager;
 import javax.naming.NamingException;
 import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
 
 import org.opencrx.kernel.account1.jmi1.Contact;
 import org.opencrx.kernel.activity1.cci2.ResourceQuery;
@@ -200,6 +201,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	 */
 	@Override
 	public ResourceModel createResource(
+		HttpServletRequest request,
 		ResourceModel resource
 	) throws DuplicateException, ValidationException {
 		PersistenceManager pm = this.getPersistenceManager();
@@ -288,6 +290,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	 */
 	@Override
 	public ResourceModel updateResource(
+		HttpServletRequest request,
 		String id,
 		ResourceModel resource
 	) throws NotFoundException, ValidationException, InternalServerErrorException {
@@ -387,6 +390,7 @@ public class OpencrxServiceProvider extends AbstractOpencrxServiceProvider imple
 	 */
 	@Override
 	public RateRefModel createRateRef(
+		HttpServletRequest request,
 		String resourceId, 
 		RateRefModel rateRef
 	) throws DuplicateException, ValidationException {
